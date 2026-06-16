@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="pixel">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>打卡鸭 - 每日任务</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=M+PLUS+Rounded+1c:wght@400;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="app">
+
+  <header class="hud">
+    <div class="hud-top">
+      <div class="hud-title-row">
+        <div class="hud-title" id="hudTitle">🦆 打卡鸭 🦆</div>
+        <div class="hud-right-btns">
+          <button class="theme-btn" id="achieveBtn" title="成就墙">🏆</button>
+          <button class="theme-btn" id="themeBtn" title="切换主题">🎨</button>
+        </div>
+      </div>
+      <div class="hud-date" id="hudDate"></div>
+    </div>
+    <div class="hud-stats" id="hudStats">
+      <div class="hud-stat">
+        <span class="stat-icon">✓</span>
+        <span class="stat-label">今日</span>
+        <span class="stat-value" id="todayCount">0</span>
+      </div>
+      <div class="hud-stat">
+        <span class="stat-icon">❤️</span>
+        <span class="stat-label">总计</span>
+        <span class="stat-value" id="totalCount">0</span>
+      </div>
+      <div class="hud-stat">
+        <span class="stat-icon">🔥</span>
+        <span class="stat-label">连击</span>
+        <span class="stat-value" id="streakCount">0</span>
+      </div>
+      <div class="hud-stat duck-level-stat" id="duckLevelStat">
+        <span class="stat-icon" id="duckLevelIcon">🥚</span>
+        <span class="stat-label">等级</span>
+        <span class="stat-value duck-level-val" id="duckLevelName">鸭蛋</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="quest-log" id="questLog">
+    <div class="quest-list" id="questList"></div>
+  </main>
+
+  <div class="bottom-panel">
+    <button class="pixel-btn add-btn" id="addBtn">+ 新任务</button>
+    <button class="pixel-btn reset-btn" id="resetBtn">⟳ 重置</button>
+    <button class="pixel-btn archive-btn" id="archiveBtn">📦 记录</button>
+  </div>
+</div>
+
+<!-- 新增任务弹窗 -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal-box">
+    <div class="modal-header">✦ 新任务 ✦</div>
+    <input class="pixel-input" id="taskInput" type="text" placeholder="输入任务名称..." maxlength="30">
+    <div class="task-type-select" id="taskTypeSelect">
+      <label class="type-option active" data-type="daily">
+        <input type="radio" name="taskType" value="daily" checked hidden>
+        <span class="type-icon">📅</span>
+        <span class="type-label">每日</span>
+      </label>
+      <label class="type-option" data-type="weekly">
+        <input type="radio" name="taskType" value="weekly" hidden>
+        <span class="type-icon">📊</span>
+        <span class="type-label">每周</span>
+      </label>
+    </div>
+    <div class="weekly-goal-wrap" id="weeklyGoalWrap" style="display:none">
+      <span class="weekly-goal-label">每周目标</span>
+      <div class="weekly-goal-control">
+        <button class="goal-btn" id="goalDec">−</button>
+        <span class="goal-value" id="goalValue">3</span>
+        <button class="goal-btn" id="goalInc">+</button>
+        <span class="goal-unit">次</span>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="pixel-btn modal-confirm" id="modalConfirm">✓ 确定</button>
+      <button class="pixel-btn modal-cancel" id="modalCancel">✗ 取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 任务日历弹窗 -->
+<div class="modal-overlay" id="calModalOverlay">
+  <div class="modal-box cal-box">
+    <div class="modal-header" id="calModalHeader">✦ 打卡日历 ✦</div>
+    <div class="cal-month-nav">
+      <button class="cal-nav-btn" id="calPrevMonth">◀</button>
+      <span class="cal-month-label" id="calMonthLabel"></span>
+      <button class="cal-nav-btn" id="calNextMonth">▶</button>
+    </div>
+    <div class="cal-weekdays">
+      <span>日</span><span>一</span><span>二</span><span>三</span>
+      <span>四</span><span>五</span><span>六</span>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="cal-stats" id="calStats"></div>
+    <div class="modal-actions">
+      <button class="pixel-btn modal-cancel" id="calClose">✗ 关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 主题切换弹窗 -->
+<div class="modal-overlay" id="themeModalOverlay">
+  <div class="modal-box theme-box">
+    <div class="modal-header">🎨 选择主题</div>
+    <div class="theme-options" id="themeOptions">
+      <div class="theme-option" data-theme="pixel">
+        <div class="theme-preview theme-preview-pixel"></div>
+        <div class="theme-info">
+          <div class="theme-name">像素鸭</div>
+          <div class="theme-desc">8-bit 复古像素 · 游戏风</div>
+        </div>
+        <div class="theme-check">✓</div>
+      </div>
+      <div class="theme-option" data-theme="anime">
+        <div class="theme-preview theme-preview-anime"></div>
+        <div class="theme-info">
+          <div class="theme-name">萌系鸭</div>
+          <div class="theme-desc">软萌和风 · 治愈系色彩</div>
+        </div>
+        <div class="theme-check">✓</div>
+      </div>
+      <div class="theme-option" data-theme="fresh">
+        <div class="theme-preview theme-preview-fresh"></div>
+        <div class="theme-info">
+          <div class="theme-name">清新鸭</div>
+          <div class="theme-desc">简约干净 · 森系色调</div>
+        </div>
+        <div class="theme-check">✓</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="pixel-btn modal-cancel" id="themeClose">✗ 关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 历史记录弹窗 -->
+<div class="modal-overlay" id="archiveModalOverlay">
+  <div class="modal-box archive-box">
+    <div class="modal-header">📦 历史记录</div>
+    <div class="archive-content" id="archiveContent"></div>
+    <div class="modal-actions">
+      <button class="pixel-btn modal-cancel" id="archiveClose">✗ 关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 成就墙弹窗 -->
+<div class="modal-overlay" id="achieveModalOverlay">
+  <div class="modal-box achieve-box">
+    <div class="modal-header">🏆 成就墙</div>
+    <div class="achieve-content" id="achieveContent"></div>
+    <div class="modal-actions">
+      <button class="pixel-btn modal-cancel" id="achieveClose">✗ 关闭</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
