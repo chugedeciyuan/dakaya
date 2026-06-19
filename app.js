@@ -60,7 +60,7 @@
   // ---- DOM ----
   var els = {}
   var elIds = [
-    'questList','todayCount','totalCount','streakCount','hudDate','hudTitle',
+    'questList','todayCount','totalCount','hudDate','hudTitle',
     'addBtn','resetBtn','themeBtn','achieveBtn','archiveBtn',
     'modalOverlay','taskInput','taskTypeSelect','weeklyGoalWrap','goalValue','goalDec','goalInc',
     'modalConfirm','modalCancel',
@@ -68,6 +68,7 @@
     'themeModalOverlay','themeOptions','themeClose',
     'archiveModalOverlay','archiveContent','archiveClose',
     'achieveModalOverlay','achieveContent','achieveClose',
+    'confirmModalOverlay','confirmIcon','confirmMessage','confirmYes','confirmNo',
     'duckLevelIcon','duckLevelName','toastContainer','app'
   ]
   elIds.forEach(function(id){ els[id] = document.getElementById(id) })
@@ -79,15 +80,15 @@
   var weekDays=['日','一','二','三','四','五','六']
 
   // ---- 主题 ----
-  var themeNames={pixel:'像素鸭',anime:'萌系鸭',fresh:'清新鸭'}
-  function loadTheme(){try{var s=localStorage.getItem(THEME_KEY);if(s&&['pixel','anime','fresh'].indexOf(s)!==-1)return s}catch(e){}return'pixel'}
+  var themeNames={zelda:'赛尔鸭',duck:'小黄鸭',summer:'夏日鸭',dragonball:'七龙珠',luoxiaohei:'罗小黑'}
+  function loadTheme(){try{var s=localStorage.getItem(THEME_KEY);if(s&&['zelda','duck','summer','dragonball','luoxiaohei'].indexOf(s)!==-1)return s}catch(e){}return'duck'}
   function saveTheme(t){try{localStorage.setItem(THEME_KEY,t)}catch(e){}}
   function applyTheme(t){
     currentTheme=t; document.documentElement.setAttribute('data-theme',t); saveTheme(t)
     var opts=els.themeOptions.querySelectorAll('.theme-option')
     opts.forEach(function(el){el.classList.toggle('active',el.dataset.theme===t)})
-    var titles={pixel:'🦆 打卡鸭 🦆',anime:'🐤 打卡ダック 🐤',fresh:'🦆 打卡鸭 🦆'}
-    els.hudTitle.textContent=titles[t]||'🦆 打卡鸭 🦆'
+    var titles={zelda:'赛尔鸭',duck:'小黄鸭',summer:'夏日鸭',dragonball:'七龙珠',luoxiaohei:'罗小黑'}
+    els.hudTitle.textContent=titles[t]||'打卡鸭'
   }
 
   // ---- 存储 ----
@@ -101,7 +102,7 @@
   function saveData(){localStorage.setItem(STORAGE_KEY,JSON.stringify(tasks))}
   function loadArchive(){try{var r=localStorage.getItem(ARCHIVE_KEY);if(r){var p=JSON.parse(r);if(Array.isArray(p)){archive=p;return}}}catch(e){}archive=[]}
   function saveArchive(){localStorage.setItem(ARCHIVE_KEY,JSON.stringify(archive))}
-  function loadBadges(){try{var r=localStorage.getItem(BADGES_KEY);if(r){var p=JSON.parse(r);if(Array.isArray(p)){earnedBadges=p;return}}}catch(e){}earnedBadges=[]}
+  function loadBadges(){try{var r=localStorage.getItem(BADGES_KEY);if(r){var p=JSON.parse(r);if(Array.isArray(p)){var seen={};earnedBadges=p.filter(function(b){if(seen[b.badgeId])return false;seen[b.badgeId]=true;return true});return}}}catch(e){}earnedBadges=[]}
   function saveBadges(){localStorage.setItem(BADGES_KEY,JSON.stringify(earnedBadges))}
 
   // ---- 统计 ----
@@ -156,7 +157,7 @@
       var longest=calcLongestStreak(task.checkins)
       var total=taskTotalCount(task)
       ACHIEVEMENTS.forEach(function(ach){
-        var already=earnedBadges.some(function(b){return b.taskId===task.id&&b.badgeId===ach.id})
+        var already=earnedBadges.some(function(b){return b.badgeId===ach.id})
         if(already)return
         var earned=false
         if(ach.type==='streak'&&longest>=ach.streak)earned=true
@@ -200,8 +201,7 @@
   }
 
   // ---- 粒子 ----
-  var hearts=['❤️','💖','💚','💛','💜','🧡'],stars=['⭐','✨','🌟','💫']
-  function spawnHearts(x,y,c){c=c||6;for(var i=0;i<c;i++)(function(){var el=document.createElement('div');el.className='heart-burst';el.textContent=hearts[Math.floor(Math.random()*hearts.length)];el.style.left=(x+(Math.random()-.5)*50)+'px';el.style.top=(y+(Math.random()-.5)*24)+'px';document.body.appendChild(el);setTimeout(function(){el.remove()},1100)})()}
+  var stars=['⭐','✨','🌟','💫']
   function spawnStars(x,y){for(var i=0;i<5;i++)(function(){var el=document.createElement('div');el.className='star-particle';el.textContent=stars[Math.floor(Math.random()*stars.length)];el.style.left=(x+(Math.random()-.5)*40)+'px';el.style.top=y+'px';document.body.appendChild(el);setTimeout(function(){el.remove()},1100)})()}
 
   // ---- Toast ----
@@ -220,7 +220,15 @@
 
   // ---- 渲染 ----
   function renderDate(){var y=today.getFullYear(),m=today.getMonth()+1,d=today.getDate();els.hudDate.textContent=y+'年'+pad(m)+'月'+pad(d)+'日 · 周'+weekDays[today.getDay()]}
-  function updateHUD(){var s=globalStats();els.todayCount.textContent=s.todayDone;els.totalCount.textContent=s.totalDone;els.streakCount.textContent=s.maxStreak;updateDuckLevel()}
+  function updateHUD(){
+    var s=globalStats()
+    updateStatPop(els.todayCount,s.todayDone)
+    updateStatPop(els.totalCount,s.totalDone)
+    updateDuckLevel()
+  }
+  function updateStatPop(el,val){
+    if(el.textContent!=String(val)){el.textContent=val;el.classList.remove('stat-pop');void el.offsetWidth;el.classList.add('stat-pop')}
+  }
 
   function render(){
     var list=els.questList;list.innerHTML='';renderDate()
@@ -228,7 +236,7 @@
     var sorted=tasks.slice().sort(function(a,b){return b.id-a.id})
     sorted.forEach(function(task){
       var checked=isCheckedToday(task),streak=taskStreak(task),total=taskTotalCount(task)
-      var item=document.createElement('div');item.className='quest-item';item.dataset.id=task.id
+      var item=document.createElement('div');item.className='quest-item'+(checked?' done':'');item.dataset.id=task.id
       var typeLabel=''
       if(task.type==='weekly'){
         var goal=task.weeklyGoal||3,cur=Math.min(streak,goal),pct=goal>0?Math.round(cur/goal*100):0
@@ -253,13 +261,58 @@
       task.checkins.splice(idx,1);saveData();render();showToast('已取消今日打卡');sndRemove()
     }else{
       task.checkins.push(todayKey);saveData();render();sndComplete()
-      var el=document.querySelector('.quest-check[data-id="'+id+'"]')
-      if(el){var r=el.getBoundingClientRect();spawnHearts(r.left+r.width/2,r.top+r.height/2)}
+      var cb=document.querySelector('.quest-check[data-id="'+id+'"]')
+      if(cb){cb.classList.remove('pop');void cb.offsetWidth;cb.classList.add('pop')}
       scanBadges() // 检测新徽章
       var streak=taskStreak(task)
       if(streak>0&&streak%7===0){setTimeout(function(){showToast('🔥 '+task.name+' 连续 '+streak+' 天！');sndStreak();shake()},400)}
       if(task.type==='weekly'){var g=task.weeklyGoal||3;var c=taskWeeklyCount(task);var msg=c>=g?'✓ '+task.name+' 本周目标达成！('+c+'/'+g+')':'✓ '+task.name+' 打卡成功！('+c+'/'+g+')';showToast(msg)}
       else{showToast('✓ '+task.name+' 打卡成功！')}
+    }
+  }
+
+  function showConfirm(msg, icon){
+    return new Promise(function(resolve){
+      els.confirmMessage.textContent=msg
+      els.confirmIcon.textContent=icon||'❓'
+      els.confirmModalOverlay.classList.add('open')
+      function onYes(){close();resolve(true)}
+      function onNo(){close();resolve(false)}
+      function onOverlay(e){if(e.target===els.confirmModalOverlay){close();resolve(false)}}
+      function onKey(e){if(e.key==='Escape'){e.preventDefault();close();resolve(false)}}
+      function close(){
+        els.confirmModalOverlay.classList.remove('open')
+        els.confirmYes.removeEventListener('click',onYes)
+        els.confirmNo.removeEventListener('click',onNo)
+        els.confirmModalOverlay.removeEventListener('click',onOverlay)
+        document.removeEventListener('keydown',onKey)
+      }
+      els.confirmYes.addEventListener('click',onYes)
+      els.confirmNo.addEventListener('click',onNo)
+      els.confirmModalOverlay.addEventListener('click',onOverlay)
+      document.addEventListener('keydown',onKey)
+    })
+  }
+
+  async function toggleDateCheckin(id, dateKey){
+    var task=tasks.find(function(t){return t.id===id});if(!task)return
+    var idx=task.checkins.indexOf(dateKey)
+    if(idx!==-1){
+      if(await showConfirm('是否取消 '+dateKey+' 的打卡？','✗')){
+        task.checkins.splice(idx,1);saveData();render()
+        if(tasks.find(function(t){return t.id===id}))renderCalendar(task)
+        showToast('✗ 已取消 '+dateKey+' 的打卡');sndRemove()
+      }
+    }else{
+      if(dateKey>todayKey){showToast('不能补卡未来的日期');return}
+      if(await showConfirm('是否补卡 '+dateKey+' ？','📝')){
+        task.checkins.push(dateKey);saveData();render();sndComplete()
+        if(tasks.find(function(t){return t.id===id}))renderCalendar(task)
+        scanBadges()
+        showToast('✓ '+dateKey+' 补卡成功！')
+        var streak=taskStreak(task)
+        if(streak>0&&streak%7===0){setTimeout(function(){showToast('🔥 '+task.name+' 连续 '+streak+' 天！');sndStreak();shake()},400)}
+      }
     }
   }
 
@@ -301,7 +354,7 @@
     var grid=els.calGrid;grid.innerHTML=''
     var firstDay=new Date(calYear,calMonth,1).getDay(),daysInMonth=new Date(calYear,calMonth+1,0).getDate()
     for(var i=0;i<firstDay;i++){var c=document.createElement('div');c.className='cal-day empty';grid.appendChild(c)}
-    for(var d=1;d<=daysInMonth;d++){var key=calYear+'-'+pad(calMonth+1)+'-'+pad(d);var checked=task.checkins.indexOf(key)!==-1;var isToday=key===todayKey;var c=document.createElement('div');c.className='cal-day';if(checked)c.classList.add('checked');if(isToday)c.classList.add('today');c.textContent=d;grid.appendChild(c)}
+    for(var d=1;d<=daysInMonth;d++){var key=calYear+'-'+pad(calMonth+1)+'-'+pad(d);var checked=task.checkins.indexOf(key)!==-1;var isToday=key===todayKey;var c=document.createElement('div');c.className='cal-day';if(checked)c.classList.add('checked');if(isToday)c.classList.add('today');c.style.cursor='pointer';c.dataset.date=key;c.textContent=d;grid.appendChild(c)}
     var streak=taskStreak(task),mc=taskMonthCount(task,calYear,calMonth),total=taskTotalCount(task)
     if(task.type==='weekly'){var g=task.weeklyGoal||3;var c=taskWeeklyCount(task);els.calStats.innerHTML='<span class="stat-line">📊 本周 '+c+'/'+g+' · 本月 '+mc+' 天</span><span class="stat-line">📅 累计打卡 '+total+' 天</span>'}
     else{els.calStats.innerHTML='<span class="stat-line">🔥 连续 '+streak+' 天 · 本月 '+mc+' 天</span><span class="stat-line">📅 累计打卡 '+total+' 天</span>'}
@@ -400,6 +453,7 @@
 
   // ---- 键盘 ----
   function onKey(e){
+    if(els.confirmModalOverlay.classList.contains('open')){return}
     if(els.calModalOverlay.classList.contains('open')){if(e.key==='Escape'){e.preventDefault();closeCalendar()}if(e.key==='ArrowLeft'){e.preventDefault();changeCalMonth(-1)}if(e.key==='ArrowRight'){e.preventDefault();changeCalMonth(1)}return}
     if(els.modalOverlay.classList.contains('open')){if(e.key==='Enter'){e.preventDefault();confirmAddModal()}if(e.key==='Escape'){e.preventDefault();closeAddModal()}return}
     if(els.themeModalOverlay.classList.contains('open')){if(e.key==='Escape'){e.preventDefault();closeThemeModal()}return}
@@ -433,6 +487,11 @@
     els.calModalOverlay.addEventListener('click',function(e){if(e.target===this)closeCalendar()})
     els.calPrevMonth.addEventListener('click',function(){changeCalMonth(-1)})
     els.calNextMonth.addEventListener('click',function(){changeCalMonth(1)})
+    els.calGrid.addEventListener('click',async function(e){
+      var day=e.target.closest('.cal-day');if(!day||day.classList.contains('empty'))return
+      var key=day.dataset.date;if(!key||!calTaskId)return
+      await toggleDateCheckin(calTaskId,key)
+    })
 
     els.themeClose.addEventListener('click',closeThemeModal)
     els.themeModalOverlay.addEventListener('click',function(e){if(e.target===this)closeThemeModal()})

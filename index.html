@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>打卡鸭 - 每日任务</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=M+PLUS+Rounded+1c:wght@400;700;800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=M+PLUS+Rounded+1c:wght@400;700;800&family=Nunito:wght@400;600;700;800&family=ZCOOL+XiaoWei&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -15,7 +15,7 @@
   <header class="hud">
     <div class="hud-top">
       <div class="hud-title-row">
-        <div class="hud-title" id="hudTitle">🦆 打卡鸭 🦆</div>
+        <div class="hud-title" id="hudTitle">打卡鸭</div>
         <div class="hud-right-btns">
           <button class="theme-btn" id="achieveBtn" title="成就墙">🏆</button>
           <button class="theme-btn" id="themeBtn" title="切换主题">🎨</button>
@@ -30,14 +30,9 @@
         <span class="stat-value" id="todayCount">0</span>
       </div>
       <div class="hud-stat">
-        <span class="stat-icon">❤️</span>
+        <span class="stat-icon">📅</span>
         <span class="stat-label">总计</span>
         <span class="stat-value" id="totalCount">0</span>
-      </div>
-      <div class="hud-stat">
-        <span class="stat-icon">🔥</span>
-        <span class="stat-label">连击</span>
-        <span class="stat-value" id="streakCount">0</span>
       </div>
       <div class="hud-stat duck-level-stat" id="duckLevelStat">
         <span class="stat-icon" id="duckLevelIcon">🥚</span>
@@ -117,27 +112,43 @@
   <div class="modal-box theme-box">
     <div class="modal-header">🎨 选择主题</div>
     <div class="theme-options" id="themeOptions">
-      <div class="theme-option" data-theme="pixel">
-        <div class="theme-preview theme-preview-pixel"></div>
+      <div class="theme-option" data-theme="zelda">
+        <div class="theme-preview theme-preview-zelda"></div>
         <div class="theme-info">
-          <div class="theme-name">像素鸭</div>
-          <div class="theme-desc">8-bit 复古像素 · 游戏风</div>
+          <div class="theme-name">赛尔鸭</div>
+          <div class="theme-desc">塞尔达传说 · 海拉鲁风</div>
         </div>
         <div class="theme-check">✓</div>
       </div>
-      <div class="theme-option" data-theme="anime">
-        <div class="theme-preview theme-preview-anime"></div>
+      <div class="theme-option" data-theme="duck">
+        <div class="theme-preview theme-preview-duck"></div>
         <div class="theme-info">
-          <div class="theme-name">萌系鸭</div>
-          <div class="theme-desc">软萌和风 · 治愈系色彩</div>
+          <div class="theme-name">小黄鸭</div>
+          <div class="theme-desc">温暖阳光 · 活力黄配色</div>
         </div>
         <div class="theme-check">✓</div>
       </div>
-      <div class="theme-option" data-theme="fresh">
-        <div class="theme-preview theme-preview-fresh"></div>
+      <div class="theme-option" data-theme="summer">
+        <div class="theme-preview theme-preview-summer"></div>
         <div class="theme-info">
-          <div class="theme-name">清新鸭</div>
-          <div class="theme-desc">简约干净 · 森系色调</div>
+          <div class="theme-name">夏日鸭</div>
+          <div class="theme-desc">海浪沙滩 · 夏日清凉风</div>
+        </div>
+        <div class="theme-check">✓</div>
+      </div>
+      <div class="theme-option" data-theme="dragonball">
+        <div class="theme-preview theme-preview-dragonball"></div>
+        <div class="theme-info">
+          <div class="theme-name">七龙珠</div>
+          <div class="theme-desc">龙珠Z · 热血战斗风</div>
+        </div>
+        <div class="theme-check">✓</div>
+      </div>
+      <div class="theme-option" data-theme="luoxiaohei">
+        <div class="theme-preview theme-preview-luoxiaohei"></div>
+        <div class="theme-info">
+          <div class="theme-name">罗小黑</div>
+          <div class="theme-desc">森林治愈 · 自然清新风</div>
         </div>
         <div class="theme-check">✓</div>
       </div>
@@ -166,6 +177,18 @@
     <div class="achieve-content" id="achieveContent"></div>
     <div class="modal-actions">
       <button class="pixel-btn modal-cancel" id="achieveClose">✗ 关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 确认弹窗 -->
+<div class="modal-overlay" id="confirmModalOverlay">
+  <div class="modal-box confirm-box">
+    <div class="confirm-icon" id="confirmIcon">❓</div>
+    <div class="confirm-message" id="confirmMessage"></div>
+    <div class="modal-actions">
+      <button class="pixel-btn modal-confirm" id="confirmYes">✓ 确定</button>
+      <button class="pixel-btn modal-cancel" id="confirmNo">✗ 取消</button>
     </div>
   </div>
 </div>
