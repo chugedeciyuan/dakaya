@@ -56,15 +56,19 @@
   var calTaskId = null
   var calYear = today.getFullYear()
   var calMonth = today.getMonth()
+  var totalCalYear = today.getFullYear()
+  var totalCalMonth = today.getMonth()
+  var totalCalActiveTab = 'weekly'
 
   // ---- DOM ----
   var els = {}
   var elIds = [
     'questList','todayCount','totalCount','hudDate','hudTitle',
     'addBtn','resetBtn','themeBtn','achieveBtn','archiveBtn',
-    'modalOverlay','taskInput','taskTypeSelect','weeklyGoalWrap','goalValue','goalDec','goalInc',
+    'modalOverlay','taskInput','taskTypeSelect','weeklyGoalWrap','goalLabel','goalValue','goalDec','goalInc',
     'modalConfirm','modalCancel',
     'calModalOverlay','calModalHeader','calPrevMonth','calNextMonth','calMonthLabel','calGrid','calStats','calClose',
+    'totalCalModalOverlay','totalCalPrevMonth','totalCalNextMonth','totalCalMonthLabel','totalCalGrid','totalCalSummary','totalCalClose',
     'themeModalOverlay','themeOptions','themeClose',
     'archiveModalOverlay','archiveContent','archiveClose',
     'achieveModalOverlay','achieveContent','achieveClose',
@@ -95,7 +99,7 @@
   function loadData(){
     try{
       var raw=localStorage.getItem(STORAGE_KEY)
-      if(raw){var p=JSON.parse(raw);if(Array.isArray(p)){tasks=p.map(function(t){if(!t.checkins||!Array.isArray(t.checkins))t.checkins=[];if(!t.createdAt)t.createdAt='';if(!t.type)t.type='daily';if(!t.weeklyGoal)t.weeklyGoal=3;return t});return}}
+      if(raw){var p=JSON.parse(raw);if(Array.isArray(p)){tasks=p.map(function(t){if(!t.checkins||!Array.isArray(t.checkins))t.checkins=[];if(!t.createdAt)t.createdAt='';if(!t.type)t.type='daily';if(!t.weeklyGoal)t.weeklyGoal=3;if(t.type==='count'&&!t.counts)t.counts={};if(!t.dailyGoal)t.dailyGoal=0;return t});return}}
     }catch(e){}
     tasks=[]
   }
@@ -109,11 +113,16 @@
   function getMonday(d){var d2=new Date(d);var day=d2.getDay();var diff=d2.getDate()-day+(day===0?-6:1);d2.setDate(diff);return dateKey(d2)}
   function taskStreak(task){
     if(task.type==='weekly')return taskWeeklyCount(task)
+    if(task.type==='count')return (task.counts&&task.counts[todayKey])||0
     var d=new Date(today),s=0,loop=365
     while(loop-- >0){if(task.checkins.indexOf(dateKey(d))!==-1){s++;d.setDate(d.getDate()-1)}else break}
     return s
   }
-  function taskWeeklyCount(task){var monday=getMonday(today);var c=0;task.checkins.forEach(function(k){if(k>=monday)c++});return c}
+  function taskWeeklyCount(task){
+    var monday=getMonday(today)
+    if(task.type==='count'){var c=0;for(var k in task.counts)if(k>=monday)c+=task.counts[k];return c}
+    var c=0;task.checkins.forEach(function(k){if(k>=monday)c++});return c
+  }
   function calcLongestStreak(dates){
     if(!dates||dates.length===0)return 0
     if(dates.length===1)return 1
@@ -121,12 +130,31 @@
     for(var i=1;i<sorted.length;i++){var diff=(new Date(sorted[i])-new Date(sorted[i-1]))/86400000;if(diff===1){cur++;if(cur>max)max=cur}else cur=1}
     return max
   }
-  function taskMonthCount(task,y,m){var days=new Date(y,m+1,0).getDate(),c=0;for(var d=1;d<=days;d++){if(task.checkins.indexOf(y+'-'+pad(m+1)+'-'+pad(d))!==-1)c++}return c}
-  function taskTotalCount(task){return task.checkins.length}
-  function isCheckedToday(task){return task.checkins.indexOf(todayKey)!==-1}
+  function taskMonthCount(task,y,m){
+    if(task.type==='count'){var prefix=y+'-'+pad(m+1),c=0;for(var k in task.counts)if(k.indexOf(prefix)===0)c+=task.counts[k];return c}
+    var days=new Date(y,m+1,0).getDate(),c=0;for(var d=1;d<=days;d++){if(task.checkins.indexOf(y+'-'+pad(m+1)+'-'+pad(d))!==-1)c++}return c
+  }
+  function taskTotalCount(task){
+    if(task.type==='count'){var c=0;for(var k in task.counts)c+=task.counts[k];return c}
+    return task.checkins.length
+  }
+  function isCheckedToday(task){
+    if(task.type==='count')return task.counts&&task.counts[todayKey]>0
+    return task.checkins.indexOf(todayKey)!==-1
+  }
   function globalStats(){
     var todayDone=0,totalDone=0,maxStreak=0
-    tasks.forEach(function(task){if(isCheckedToday(task))todayDone++;totalDone+=taskTotalCount(task);var s=taskStreak(task);if(s>maxStreak)maxStreak=s})
+    tasks.forEach(function(task){
+      if(task.type==='count'){
+        var goal=task.dailyGoal||0,tc=task.counts&&task.counts[todayKey]||0
+        if(goal>0){if(tc>=goal)todayDone++;var comp=0;for(var k in task.counts)if(task.counts[k]>=goal)comp++;totalDone+=comp}
+        else{if(tc>0)todayDone++;totalDone+=Object.keys(task.counts||{}).filter(function(k){return task.counts[k]>0}).length}
+      }else{
+        if(isCheckedToday(task))todayDone++
+        totalDone+=taskTotalCount(task)
+      }
+      var s=taskStreak(task);if(s>maxStreak)maxStreak=s
+    })
     return{todayDone:todayDone,totalDone:totalDone,maxStreak:maxStreak}
   }
 
@@ -154,7 +182,8 @@
     var newBadges=[]
     if(!tasks)return
     tasks.forEach(function(task){
-      var longest=calcLongestStreak(task.checkins)
+      var dates=task.type==='count'?Object.keys(task.counts).filter(function(k){return task.counts[k]>0}):task.checkins
+      var longest=calcLongestStreak(dates)
       var total=taskTotalCount(task)
       ACHIEVEMENTS.forEach(function(ach){
         var already=earnedBadges.some(function(b){return b.badgeId===ach.id})
@@ -236,19 +265,29 @@
     var sorted=tasks.slice().sort(function(a,b){return b.id-a.id})
     sorted.forEach(function(task){
       var checked=isCheckedToday(task),streak=taskStreak(task),total=taskTotalCount(task)
-      var item=document.createElement('div');item.className='quest-item'+(checked?' done':'');item.dataset.id=task.id
+      var todayC=(task.type==='count'&&task.counts&&task.counts[todayKey])||0
+      var countGoal=task.dailyGoal||0
+      var isDone=task.type==='count'?(countGoal>0?todayC>=countGoal:todayC>0):checked
+      var item=document.createElement('div');item.className='quest-item quest-item-'+task.type+(isDone?' done':'');item.dataset.id=task.id
       var typeLabel=''
       if(task.type==='weekly'){
         var goal=task.weeklyGoal||3,cur=Math.min(streak,goal),pct=goal>0?Math.round(cur/goal*100):0
         typeLabel='<div class="weekly-progress"><div class="weekly-bar-wrap"><div class="weekly-bar-fill" style="width:'+pct+'%"></div></div><span class="weekly-label">'+cur+'/'+goal+'</span></div>'
+      }else if(task.type==='count'){
+        if(countGoal>0){var pct=Math.min(100,Math.round(todayC/countGoal*100));typeLabel='<div class="weekly-progress"><div class="weekly-bar-wrap"><div class="weekly-bar-fill" style="width:'+pct+'%"></div></div><span class="weekly-label">'+todayC+'/'+countGoal+'</span></div>'}
       }else{
         typeLabel='<span class="meta-item"><span class="meta-icon">🔥</span><span class="meta-streak">'+streak+'天</span></span>'
       }
-      item.innerHTML='<div class="quest-check'+(checked?' done':'')+'" data-id="'+task.id+'">'+(checked?'✓':'')+'</div>'+
-        '<div class="quest-info"><div class="quest-name'+(checked?' done-text':'')+'">'+escapeHtml(task.name)+'</div>'+
-        '<div class="quest-meta">'+typeLabel+'<span class="meta-item"><span class="meta-icon">📅</span><span>共'+total+'天</span></span></div></div>'+
+      var batHtml='',batPct=0
+      if(task.type==='count'){batPct=countGoal>0?Math.min(100,Math.round(todayC/countGoal*100)):0;batHtml='<div class="quest-count-battery" style="width:0"></div>'}
+      var checkHtml=task.type==='count'?'<div class="quest-check count-display'+(isDone?' done':'')+'" data-id="'+task.id+'">'+(todayC||'')+'</div>':'<div class="quest-check'+(checked?' done':'')+'" data-id="'+task.id+'">'+(checked?'✓':'')+'</div>'
+      var totalLabel=task.type==='count'?'共'+total+'次':'共'+total+'天'
+      item.innerHTML=batHtml+checkHtml+
+        '<div class="quest-info"><div class="quest-name'+(isDone?' done-text':'')+'">'+escapeHtml(task.name)+'</div>'+
+        '<div class="quest-meta">'+typeLabel+'<span class="meta-item"><span class="meta-icon">📅</span><span>'+totalLabel+'</span></span></div></div>'+
         '<button class="quest-cal-btn" data-id="'+task.id+'">📅</button><button class="quest-del" data-id="'+task.id+'">✗</button>'
       list.appendChild(item)
+      if(task.type==='count'&&batPct>0){var bat=item.querySelector('.quest-count-battery');if(bat){bat.animate([{width:'0'},{width:batPct+'%'}],{duration:600,easing:'cubic-bezier(.34,1.56,.64,1)',fill:'forwards'})}}
     })
     updateHUD()
   }
@@ -256,6 +295,17 @@
   // ---- 打卡 ----
   function toggleCheckin(id){
     var task=tasks.find(function(t){return t.id===id});if(!task)return
+    if(task.type==='count'){
+      if(!task.counts)task.counts={}
+      task.counts[todayKey]=(task.counts[todayKey]||0)+1
+      saveData();render();sndComplete()
+      var cb=document.querySelector('.quest-check[data-id="'+id+'"]')
+      if(cb){cb.classList.remove('pop');void cb.offsetWidth;cb.classList.add('pop')}
+      var todayC=task.counts[todayKey],goal=task.dailyGoal||0
+      if(goal>0&&todayC>=goal){showToast('✓ '+task.name+' 目标达成！('+todayC+'/'+goal+')');if(todayC===goal){setTimeout(function(){sndStreak()},200)}}
+      else{showToast('✓ '+task.name+' +1（共'+todayC+'次）')}
+      return
+    }
     var idx=task.checkins.indexOf(todayKey)
     if(idx!==-1){
       task.checkins.splice(idx,1);saveData();render();showToast('已取消今日打卡');sndRemove()
@@ -296,6 +346,16 @@
 
   async function toggleDateCheckin(id, dateKey){
     var task=tasks.find(function(t){return t.id===id});if(!task)return
+    if(task.type==='count'){
+      if(dateKey>todayKey){showToast('不能补卡未来的日期');return}
+      if(!task.counts)task.counts={}
+      if(await showConfirm('为 '+dateKey+' 的「'+task.name+'」+1？（当前：'+(task.counts[dateKey]||0)+' 次）','🔢')){
+        task.counts[dateKey]=(task.counts[dateKey]||0)+1;saveData();render();sndComplete()
+        if(tasks.find(function(t){return t.id===id}))renderCalendar(task)
+        showToast('✓ '+dateKey+' +1（共'+(task.counts[dateKey]||0)+'次）')
+      }
+      return
+    }
     var idx=task.checkins.indexOf(dateKey)
     if(idx!==-1){
       if(await showConfirm('是否取消 '+dateKey+' 的打卡？','✗')){
@@ -320,24 +380,28 @@
   function deleteTask(id){
     var idx=tasks.findIndex(function(t){return t.id===id});if(idx===-1)return
     var task=tasks[idx];var dates=task.checkins.slice().sort()
-    archive.push({name:task.name,type:task.type,weeklyGoal:task.weeklyGoal,checkins:task.checkins.slice(),firstDate:dates.length>0?dates[0]:'无',lastDate:dates.length>0?dates[dates.length-1]:'无',totalCount:taskTotalCount(task),longestStreak:calcLongestStreak(dates),deletedAt:todayKey})
-    saveArchive();tasks.splice(idx,1);saveData();render();sndRemove();showToast('📦 任务已归档，历史已保存')
+    var archiveEntry={name:task.name,type:task.type,weeklyGoal:task.weeklyGoal,checkins:task.checkins.slice(),firstDate:dates.length>0?dates[0]:'无',lastDate:dates.length>0?dates[dates.length-1]:'无',totalCount:taskTotalCount(task),longestStreak:calcLongestStreak(dates),deletedAt:todayKey}
+    if(task.type==='count'&&task.counts)archiveEntry.counts=JSON.parse(JSON.stringify(task.counts))
+    archive.push(archiveEntry);saveArchive();tasks.splice(idx,1);saveData();render();sndRemove();showToast('📦 任务已归档，历史已保存')
   }
 
   // ---- 归档删除 ----
   function deleteArchiveItem(index){archive.splice(index,1);saveArchive();renderArchive();showToast('✗ 已从记录中移除')}
 
   // ---- 新增任务 ----
-  function addTask(name,type,weeklyGoal){
+  function addTask(name,type,goal){
     name=name.trim();if(!name){showToast('请输入任务名称！');sndError();return false}
     if(tasks.length>=MAX_TASKS){showToast('任务已满！先完成一些吧 🦆');sndError();return false}
-    tasks.push({id:Date.now()+Math.random(),name:name,type:type||'daily',weeklyGoal:weeklyGoal||3,checkins:[],createdAt:todayKey})
-    saveData();render();sndAdd();var rect=els.addBtn.getBoundingClientRect();spawnStars(rect.left+rect.width/2,rect.top);showToast('✦ 新任务已添加！');return true
+    var task={id:Date.now()+Math.random(),name:name,type:type||'daily',weeklyGoal:type==='weekly'?(goal||3):3,checkins:[],createdAt:todayKey}
+    if(type==='count'){task.counts={};task.dailyGoal=goal||0}
+    tasks.push(task);saveData();render();sndAdd();var rect=els.addBtn.getBoundingClientRect();spawnStars(rect.left+rect.width/2,rect.top);showToast('✦ 新任务已添加！');return true
   }
 
   // ---- 重置 ----
   function resetToday(){
-    var changed=false;tasks.forEach(function(task){var idx=task.checkins.indexOf(todayKey);if(idx!==-1){task.checkins.splice(idx,1);changed=true}})
+    var changed=false;tasks.forEach(function(task){
+      if(task.type==='count'){if(task.counts&&task.counts[todayKey]){task.counts[todayKey]=0;changed=true}}else{var idx=task.checkins.indexOf(todayKey);if(idx!==-1){task.checkins.splice(idx,1);changed=true}}
+    })
     if(!changed){showToast('今天还没有打卡记录');return}
     saveData();render();showToast('⟳ 今日打卡已全部重置');sndRemove()
   }
@@ -354,18 +418,63 @@
     var grid=els.calGrid;grid.innerHTML=''
     var firstDay=new Date(calYear,calMonth,1).getDay(),daysInMonth=new Date(calYear,calMonth+1,0).getDate()
     for(var i=0;i<firstDay;i++){var c=document.createElement('div');c.className='cal-day empty';grid.appendChild(c)}
-    for(var d=1;d<=daysInMonth;d++){var key=calYear+'-'+pad(calMonth+1)+'-'+pad(d);var checked=task.checkins.indexOf(key)!==-1;var isToday=key===todayKey;var c=document.createElement('div');c.className='cal-day';if(checked)c.classList.add('checked');if(isToday)c.classList.add('today');c.style.cursor='pointer';c.dataset.date=key;c.textContent=d;grid.appendChild(c)}
+    for(var d=1;d<=daysInMonth;d++){
+      var key=calYear+'-'+pad(calMonth+1)+'-'+pad(d);var isToday=key===todayKey;var c=document.createElement('div');c.className='cal-day'
+      if(task.type==='count'){
+        var cnt=(task.counts&&task.counts[key])||0;if(cnt>0)c.classList.add('checked');c.textContent=cnt>0?cnt:d
+      }else{
+        var checked=task.checkins.indexOf(key)!==-1;if(checked)c.classList.add('checked');c.textContent=d
+      }
+      if(isToday)c.classList.add('today');c.style.cursor='pointer';c.dataset.date=key;grid.appendChild(c)
+    }
     var streak=taskStreak(task),mc=taskMonthCount(task,calYear,calMonth),total=taskTotalCount(task)
-    if(task.type==='weekly'){var g=task.weeklyGoal||3;var c=taskWeeklyCount(task);els.calStats.innerHTML='<span class="stat-line">📊 本周 '+c+'/'+g+' · 本月 '+mc+' 天</span><span class="stat-line">📅 累计打卡 '+total+' 天</span>'}
+    if(task.type==='count'){var g=task.dailyGoal||0,gc=task.counts&&task.counts[todayKey]||0;els.calStats.innerHTML='<span class="stat-line">🔢 今日 '+gc+' 次 · '+mc+' 次/月</span><span class="stat-line">📅 累计 '+total+' 次</span>'+(g>0?'<span class="stat-line">🎯 目标 '+g+' 次/日</span>':'')}
+    else if(task.type==='weekly'){var g=task.weeklyGoal||3;var c=taskWeeklyCount(task);els.calStats.innerHTML='<span class="stat-line">📊 本周 '+c+'/'+g+' · 本月 '+mc+' 天</span><span class="stat-line">📅 累计打卡 '+total+' 天</span>'}
     else{els.calStats.innerHTML='<span class="stat-line">🔥 连续 '+streak+' 天 · 本月 '+mc+' 天</span><span class="stat-line">📅 累计打卡 '+total+' 天</span>'}
   }
   function changeCalMonth(delta){calMonth+=delta;if(calMonth>11){calMonth=0;calYear++}if(calMonth<0){calMonth=11;calYear--};var task=tasks.find(function(t){return t.id===calTaskId});if(task)renderCalendar(task)}
+
+  // ---- 总览日历 ----
+  function openTotalCalendar(){
+    totalCalYear=today.getFullYear();totalCalMonth=today.getMonth()
+    renderTotalCalendar();els.totalCalModalOverlay.classList.add('open')
+  }
+  function closeTotalCalendar(){els.totalCalModalOverlay.classList.remove('open')}
+  function renderTotalCalendar(){
+    els.totalCalMonthLabel.textContent=totalCalYear+'年'+(totalCalMonth+1)+'月'
+    var grid=els.totalCalGrid;grid.innerHTML=''
+    var firstDay=new Date(totalCalYear,totalCalMonth,1).getDay(),daysInMonth=new Date(totalCalYear,totalCalMonth+1,0).getDate()
+    var checkedDates={};tasks.forEach(function(t){if(t.type==='count'){for(var k in t.counts)if(t.counts[k]>0)checkedDates[k]=true}else{t.checkins.forEach(function(d){checkedDates[d]=true})}})
+    for(var i=0;i<firstDay;i++){var c=document.createElement('div');c.className='cal-day empty';grid.appendChild(c)}
+    for(var d=1;d<=daysInMonth;d++){
+      var key=totalCalYear+'-'+pad(totalCalMonth+1)+'-'+pad(d),checked=!!checkedDates[key],isToday=key===todayKey
+      var c=document.createElement('div');c.className='cal-day';if(checked)c.classList.add('checked');if(isToday)c.classList.add('today');c.textContent=d;grid.appendChild(c)
+    }
+    var monday=getMonday(today),weeklyTasks=[],monthlyTasks=[]
+    tasks.forEach(function(t){
+      var wc=taskWeeklyCount(t);if(wc>0)weeklyTasks.push({name:t.name,count:wc,type:t.type})
+      var mc=taskMonthCount(t,totalCalYear,totalCalMonth);if(mc>0)monthlyTasks.push({name:t.name,count:mc,type:t.type})
+    })
+    var html='<div class="total-cal-tabs"><span class="total-cal-tab'+(totalCalActiveTab==='weekly'?' active':'')+'" data-tab="weekly">📊 本周</span><span class="total-cal-tab'+(totalCalActiveTab==='monthly'?' active':'')+'" data-tab="monthly">📅 本月</span></div>'
+    if(totalCalActiveTab==='weekly'){
+      if(weeklyTasks.length===0){html+='<div class="total-cal-empty">本周还没有打卡记录</div>'}else{
+        weeklyTasks.forEach(function(t){html+='<div class="total-cal-task"><span class="total-cal-check">✓</span><span class="total-cal-task-name">'+escapeHtml(t.name)+'</span><span class="total-cal-count">本周 '+t.count+' 次</span></div>'})
+      }
+    }else{
+      if(monthlyTasks.length===0){html+='<div class="total-cal-empty">本月还没有打卡记录</div>'}else{
+        monthlyTasks.forEach(function(t){html+='<div class="total-cal-task"><span class="total-cal-check">✓</span><span class="total-cal-task-name">'+escapeHtml(t.name)+'</span><span class="total-cal-count">本月 '+t.count+(t.type==='count'?' 次':' 天')+'</span></div>'})
+      }
+    }
+    els.totalCalSummary.innerHTML=html
+  }
+  function changeTotalCalMonth(delta){totalCalMonth+=delta;if(totalCalMonth>11){totalCalMonth=0;totalCalYear++}if(totalCalMonth<0){totalCalMonth=11;totalCalYear--};renderTotalCalendar()}
 
   // ---- 新增弹窗 ----
   var modalCb=null,modalType='daily',modalGoal=3
   function openAddModal(cb){
     modalCb=cb;modalType='daily';modalGoal=3;els.modalOverlay.classList.add('open');els.taskInput.value='';els.weeklyGoalWrap.style.display='none';els.goalValue.textContent='3'
     els.taskTypeSelect.querySelectorAll('.type-option').forEach(function(el){el.classList.toggle('active',el.dataset.type==='daily')})
+    els.goalLabel.textContent='每周目标'
     setTimeout(function(){els.taskInput.focus()},100)
   }
   function closeAddModal(){els.modalOverlay.classList.remove('open');modalCb=null}
@@ -385,7 +494,7 @@
     sorted.forEach(function(entry,idx){
       var item=document.createElement('div');item.className='archive-item'
       var dateRange=entry.firstDate+' ~ '+entry.lastDate;if(entry.firstDate==='无')dateRange='无打卡记录'
-      var typeTag=entry.type==='weekly'?'周':'日'
+      var typeTag=entry.type==='weekly'?'周':(entry.type==='count'?'计':'日')
       item.innerHTML='<button class="archive-del" data-index="'+idx+'">✗</button><div class="archive-item-header"><div class="archive-item-name"><span style="font-size:12px;margin-right:4px">'+typeTag+'</span>'+escapeHtml(entry.name)+'</div><span class="archive-item-badge">'+entry.totalCount+'次</span></div><div class="archive-item-dates">📅 '+escapeHtml(dateRange)+'</div><div class="archive-item-stats"><span class="archive-stat">🔥 最长连续 <span class="arch-stat-val">'+entry.longestStreak+'</span> 天</span><span class="archive-stat">📅 累计 <span class="arch-stat-val">'+entry.totalCount+'</span> 天</span><span class="archive-stat">🗑️ '+entry.deletedAt+'</span></div>'
       container.appendChild(item)
     })
@@ -455,6 +564,7 @@
   function onKey(e){
     if(els.confirmModalOverlay.classList.contains('open')){return}
     if(els.calModalOverlay.classList.contains('open')){if(e.key==='Escape'){e.preventDefault();closeCalendar()}if(e.key==='ArrowLeft'){e.preventDefault();changeCalMonth(-1)}if(e.key==='ArrowRight'){e.preventDefault();changeCalMonth(1)}return}
+    if(els.totalCalModalOverlay.classList.contains('open')){if(e.key==='Escape'){e.preventDefault();closeTotalCalendar()}if(e.key==='ArrowLeft'){e.preventDefault();changeTotalCalMonth(-1)}if(e.key==='ArrowRight'){e.preventDefault();changeTotalCalMonth(1)}return}
     if(els.modalOverlay.classList.contains('open')){if(e.key==='Enter'){e.preventDefault();confirmAddModal()}if(e.key==='Escape'){e.preventDefault();closeAddModal()}return}
     if(els.themeModalOverlay.classList.contains('open')){if(e.key==='Escape'){e.preventDefault();closeThemeModal()}return}
     if(els.archiveModalOverlay.classList.contains('open')){if(e.key==='Escape'){e.preventDefault();closeArchiveModal()}return}
@@ -478,10 +588,14 @@
     els.taskTypeSelect.addEventListener('click',function(e){
       var opt=e.target.closest('.type-option');if(!opt)return
       var type=opt.dataset.type;els.taskTypeSelect.querySelectorAll('.type-option').forEach(function(el){el.classList.toggle('active',el.dataset.type===type)})
-      modalType=type;els.weeklyGoalWrap.style.display=type==='weekly'?'flex':'none'
+      modalType=type
+      if(type==='count'){els.weeklyGoalWrap.style.display='flex';els.goalLabel.textContent='每日目标';modalGoal=8}
+      else if(type==='weekly'){els.weeklyGoalWrap.style.display='flex';els.goalLabel.textContent='每周目标';modalGoal=3}
+      else{els.weeklyGoalWrap.style.display='none'}
+      els.goalValue.textContent=modalGoal
     })
     els.goalDec.addEventListener('click',function(){modalGoal=Math.max(1,modalGoal-1);els.goalValue.textContent=modalGoal})
-    els.goalInc.addEventListener('click',function(){modalGoal=Math.min(30,modalGoal+1);els.goalValue.textContent=modalGoal})
+    els.goalInc.addEventListener('click',function(){modalGoal=Math.min(modalType==='count'?99:30,modalGoal+1);els.goalValue.textContent=modalGoal})
 
     els.calClose.addEventListener('click',closeCalendar)
     els.calModalOverlay.addEventListener('click',function(e){if(e.target===this)closeCalendar()})
@@ -492,6 +606,17 @@
       var key=day.dataset.date;if(!key||!calTaskId)return
       await toggleDateCheckin(calTaskId,key)
     })
+
+    els.totalCalClose.addEventListener('click',closeTotalCalendar)
+    els.totalCalModalOverlay.addEventListener('click',function(e){if(e.target===this)closeTotalCalendar()})
+    els.totalCalPrevMonth.addEventListener('click',function(){changeTotalCalMonth(-1)})
+    els.totalCalNextMonth.addEventListener('click',function(){changeTotalCalMonth(1)})
+    els.totalCalSummary.addEventListener('click',function(e){
+      var tab=e.target.closest('.total-cal-tab');if(!tab)return
+      var t=tab.dataset.tab;if(t&&t!==totalCalActiveTab){totalCalActiveTab=t;renderTotalCalendar()}
+    })
+    els.totalCount.parentElement.style.cursor='pointer'
+    els.totalCount.parentElement.addEventListener('click',function(e){ripple(this,e);openTotalCalendar()})
 
     els.themeClose.addEventListener('click',closeThemeModal)
     els.themeModalOverlay.addEventListener('click',function(e){if(e.target===this)closeThemeModal()})

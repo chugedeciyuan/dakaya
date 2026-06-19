@@ -69,9 +69,14 @@
         <span class="type-icon">📊</span>
         <span class="type-label">每周</span>
       </label>
+      <label class="type-option" data-type="count">
+        <input type="radio" name="taskType" value="count" hidden>
+        <span class="type-icon">🔢</span>
+        <span class="type-label">计数</span>
+      </label>
     </div>
     <div class="weekly-goal-wrap" id="weeklyGoalWrap" style="display:none">
-      <span class="weekly-goal-label">每周目标</span>
+      <span class="weekly-goal-label" id="goalLabel">每周目标</span>
       <div class="weekly-goal-control">
         <button class="goal-btn" id="goalDec">−</button>
         <span class="goal-value" id="goalValue">3</span>
@@ -103,6 +108,27 @@
     <div class="cal-stats" id="calStats"></div>
     <div class="modal-actions">
       <button class="pixel-btn modal-cancel" id="calClose">✗ 关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- 总览日历弹窗 -->
+<div class="modal-overlay" id="totalCalModalOverlay">
+  <div class="modal-box cal-box total-cal-box">
+    <div class="modal-header">✦ 总览日历 ✦</div>
+    <div class="cal-month-nav">
+      <button class="cal-nav-btn" id="totalCalPrevMonth">◀</button>
+      <span class="cal-month-label" id="totalCalMonthLabel"></span>
+      <button class="cal-nav-btn" id="totalCalNextMonth">▶</button>
+    </div>
+    <div class="cal-weekdays">
+      <span>日</span><span>一</span><span>二</span><span>三</span>
+      <span>四</span><span>五</span><span>六</span>
+    </div>
+    <div class="cal-grid" id="totalCalGrid"></div>
+    <div class="total-cal-summary" id="totalCalSummary"></div>
+    <div class="modal-actions">
+      <button class="pixel-btn modal-cancel" id="totalCalClose">✗ 关闭</button>
     </div>
   </div>
 </div>
